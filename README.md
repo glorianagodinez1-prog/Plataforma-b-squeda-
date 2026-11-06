@@ -1,5 +1,7 @@
 # Recepción en vivo
 
+> **¿Quieres que tu equipo entre sin instalar nada ni crear cuentas?** Usa la versión de la carpeta [`docs/`](docs/) y sigue [INSTRUCCIONES.md](INSTRUCCIONES.md). Lo de abajo es la versión con servidor propio (Node.js).
+
 Plataforma web para recibir personas a partir de tu base de datos en Excel.
 
 - **Importar Excel** (`.xlsx`, `.xls`, `.csv`, `.ods`): eliges qué columna(s) son el nombre y, si quieres, cuál es la ubicación (mesa, zona, sección…).

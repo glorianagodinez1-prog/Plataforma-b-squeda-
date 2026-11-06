@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cada evento vive bajo un código largo y secreto que va en el enlace.
+    // Quien tiene el enlace puede ver y marcar; sin el código no se puede leer nada.
+    match /eventos/{codigo}/{coleccion}/{doc} {
+      allow read, write: if codigo.size() >= 8
+                         && coleccion in ['people', 'tables', 'meta'];
+    }
+  }
+}
