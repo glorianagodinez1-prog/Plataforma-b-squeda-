@@ -1,0 +1,865 @@
+<title>Recepción en vivo</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap">
+<style>
+/* Layout: barra fija arriba (marca, pestañas, contadores) + un panel por pestaña; el buscador manda en Recepción. */
+:root {
+  --bg: #f3f5f5;
+  --surface: #ffffff;
+  --surface-2: #e8eded;
+  --line: #d3dcdc;
+  --fg: #142426;
+  --muted: #5b6e70;
+  --accent: #0d6670;
+  --accent-fg: #ffffff;
+  --ok: #18834a;
+  --ok-soft: #dcf2e4;
+  --wait: #a8650a;
+  --wait-soft: #fbeed6;
+  --danger: #c43636;
+  --hl: #fff0a3;
+  --shadow: 0 1px 2px rgba(10, 40, 44, .08), 0 6px 18px rgba(10, 40, 44, .07);
+  --f-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1718; --surface: #172224; --surface-2: #213033; --line: #2d3f42;
+    --fg: #e4eeee; --muted: #93a7a9; --accent: #4fb8c2; --accent-fg: #062224;
+    --ok: #4fd18a; --ok-soft: #173a28; --wait: #f0b552; --wait-soft: #3b2c12;
+    --danger: #f07070; --hl: #5a4d12; --shadow: 0 1px 3px rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1718; --surface: #172224; --surface-2: #213033; --line: #2d3f42;
+  --fg: #e4eeee; --muted: #93a7a9; --accent: #4fb8c2; --accent-fg: #062224;
+  --ok: #4fd18a; --ok-soft: #173a28; --wait: #f0b552; --wait-soft: #3b2c12;
+  --danger: #f07070; --hl: #5a4d12; --shadow: 0 1px 3px rgba(0,0,0,.5);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--fg); font: 16px/1.45 var(--f-body); }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+kbd { font: 12px var(--f-body); background: var(--surface-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+.wrap { max-width: 1400px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+header.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line); }
+.top .wrap { display: flex; align-items: center; gap: 8px 18px; flex-wrap: wrap; padding-block: 10px; }
+.brand { font: 800 19px/1 var(--f-display); letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+.live { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+.live.on { background: var(--ok); box-shadow: 0 0 0 3px var(--ok-soft); }
+nav.tabs { display: flex; gap: 2px; background: var(--surface-2); padding: 3px; border-radius: 10px; }
+.tab { border: 0; background: none; padding: 7px 14px; border-radius: 8px; font-weight: 700; color: var(--muted); }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
+.counts { margin-left: auto; display: flex; gap: 16px; align-items: baseline; font-variant-numeric: tabular-nums; }
+.count b { font: 800 22px/1 var(--f-display); }
+.count small { color: var(--muted); margin-left: 4px; font-size: 13px; }
+.count.ok b { color: var(--ok); } .count.wait b { color: var(--wait); }
+.bar { height: 4px; background: var(--surface-2); }
+.bar div { height: 100%; width: 0; background: var(--ok); transition: width .4s; }
+
+main { padding-block: 16px 60px; }
+.panel[hidden] { display: none; }
+.notice { background: var(--wait-soft); border: 1px solid var(--line); padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; font-size: 14px; }
+
+/* Recepción */
+.search { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+#q { flex: 1 1 280px; min-width: 0; font-size: 20px; padding: 14px 16px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface); }
+#q:focus { border-color: var(--accent); outline: none; }
+.chips { display: flex; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); padding: 7px 14px; border-radius: 999px; font-weight: 700; font-size: 14px; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.hint { color: var(--muted); font-size: 13px; margin: 8px 0 12px; }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-left: 6px solid var(--wait); border-radius: 10px; padding: 10px 12px 10px 14px; cursor: pointer; }
+.row.in { border-left-color: var(--ok); }
+.row.sel { outline: 2px solid var(--accent); outline-offset: 1px; }
+.row .who { min-width: 0; }
+.row .name { font-weight: 700; font-size: 17px; }
+.row .meta { color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+mark { background: var(--hl); color: inherit; border-radius: 2px; }
+.loc { border: 1px solid var(--line); background: var(--surface-2); border-radius: 999px; padding: 3px 10px; font-size: 13px; white-space: nowrap; }
+.loc.none { background: none; border-style: dashed; color: var(--muted); }
+.mark { min-width: 150px; border: 2px solid var(--wait); background: var(--wait-soft); color: var(--wait); font-weight: 700; padding: 8px 12px; border-radius: 10px; line-height: 1.2; }
+.mark.on { border-color: var(--ok); background: var(--ok-soft); color: var(--ok); }
+.mark small { display: block; font-weight: 400; font-size: 12px; }
+.mark:disabled { cursor: default; opacity: .85; }
+.more, .empty { color: var(--muted); text-align: center; padding: 14px; }
+.empty-card { background: var(--surface); border: 1px dashed var(--line); border-radius: 14px; padding: 28px 20px; text-align: center; display: grid; gap: 12px; justify-items: center; }
+.empty-card h2 { font: 800 22px var(--f-display); margin: 0; text-wrap: balance; }
+.empty-card p { margin: 0; color: var(--muted); max-width: 52ch; }
+@media (max-width: 640px) {
+  .row { grid-template-columns: 1fr auto; }
+  .row .mark { grid-column: 1 / -1; width: 100%; }
+  .counts { margin-left: 0; width: 100%; }
+}
+
+/* Plano */
+.plano { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; }
+@media (max-width: 820px) { .plano { grid-template-columns: minmax(0, 1fr); } }
+.side { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; max-height: 70vh; }
+.side h3 { margin: 0; font: 700 15px var(--f-body); display: flex; gap: 8px; align-items: center; }
+.pill { background: var(--surface-2); border-radius: 999px; padding: 0 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.side input, .field input, .field select { width: 100%; padding: 9px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); }
+.pool { overflow: auto; display: flex; flex-direction: column; gap: 4px; min-height: 60px; border-radius: 8px; padding: 2px; flex: 1; }
+.p { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 6px; background: var(--wait-soft); font-size: 13px; cursor: grab; user-select: none; -webkit-user-select: none; }
+.p::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--wait); }
+.p.in { background: var(--ok-soft); } .p.in::before { background: var(--ok); }
+.p span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.legend { margin-left: auto; color: var(--muted); font-size: 13px; display: flex; gap: 12px; }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+.canvas-wrap { overflow: auto; height: 70vh; min-height: 380px; border: 1px solid var(--line); border-radius: 12px; background-color: var(--surface-2); background-image: radial-gradient(var(--line) 1px, transparent 1px); background-size: 20px 20px; }
+.canvas { position: relative; min-width: 100%; min-height: 100%; }
+.mesa { position: absolute; width: 176px; max-height: 270px; display: flex; flex-direction: column; background: var(--surface); border: 2px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); }
+.mesa.full { border-color: var(--ok); } .mesa.over { border-color: var(--danger); }
+.mesa.flash { animation: flash 1.4s ease 2; }
+@keyframes flash { 50% { box-shadow: 0 0 0 6px var(--accent); } }
+@media (prefers-reduced-motion: reduce) { .mesa.flash { animation: none; border-color: var(--accent); } .bar div { transition: none; } }
+.mhead { display: flex; justify-content: space-between; gap: 6px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--line); cursor: move; touch-action: none; }
+.mname { font: 700 15px var(--f-display); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mcount { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.medit { border: 0; background: none; color: var(--muted); padding: 0 2px; font-size: 15px; }
+.mbar { height: 4px; background: var(--surface-2); } .mbar div { height: 100%; background: var(--ok); }
+.mbody { padding: 6px; overflow: auto; display: flex; flex-direction: column; gap: 3px; min-height: 42px; }
+.mbody .vacia { color: var(--muted); font-size: 12px; text-align: center; padding: 8px 0; }
+.drop.over-target { outline: 3px dashed var(--accent); outline-offset: 2px; }
+
+/* Datos */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 14px; align-items: start; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.card h3 { margin: 0; font: 700 18px var(--f-display); }
+.card p { margin: 0; color: var(--muted); font-size: 14px; }
+.card.danger { border-color: var(--danger); }
+.field { display: grid; gap: 4px; font-size: 14px; font-weight: 700; }
+.field small { font-weight: 400; color: var(--muted); }
+.radio { display: flex; gap: 6px; align-items: center; font-size: 14px; }
+.preview { overflow-x: auto; font-size: 12px; max-height: 190px; }
+.preview table { border-collapse: collapse; }
+.preview th, .preview td { border: 1px solid var(--line); padding: 3px 6px; white-space: nowrap; text-align: left; }
+.progress { height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.progress div { height: 100%; width: 0; background: var(--accent); }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 9px; padding: 9px 14px; font-weight: 700; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.btn.danger { color: var(--danger); border-color: var(--danger); }
+.btn:disabled { opacity: .5; cursor: default; }
+
+dialog { border: 1px solid var(--line); border-radius: 14px; padding: 0; width: min(520px, calc(100vw - 32px)); background: var(--surface); color: var(--fg); box-shadow: var(--shadow); }
+dialog::backdrop { background: rgba(5, 20, 22, .5); }
+.dlg { padding: 18px; display: grid; gap: 12px; }
+.dlg h2 { margin: 0; font: 800 22px var(--f-display); text-wrap: balance; }
+.dlg dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0; max-height: 40vh; overflow: auto; font-size: 14px; }
+.dlg dt { color: var(--muted); } .dlg dd { margin: 0; overflow-wrap: anywhere; }
+.actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+
+.toast { position: fixed; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translate(-50%, 120px); background: var(--fg); color: var(--bg); padding: 10px 16px; border-radius: 10px; transition: transform .25s; z-index: 50; max-width: calc(100vw - 32px); }
+.toast.show { transform: translate(-50%, 0); }
+</style>
+
+<header class="top">
+  <div class="wrap">
+    <div class="brand"><span id="live" class="live" title="Conectando…"></span>Recepción en vivo</div>
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-recepcion" aria-selected="true">Recepción</button>
+      <button class="tab" role="tab" id="t-plano" aria-selected="false">Ubicaciones</button>
+      <button class="tab" role="tab" id="t-datos" aria-selected="false">Datos</button>
+    </nav>
+    <div class="counts">
+      <span class="count"><b id="cTotal">0</b><small>total</small></span>
+      <span class="count ok"><b id="cIn">0</b><small>llegaron</small></span>
+      <span class="count wait"><b id="cWait">0</b><small>pendientes</small></span>
+    </div>
+  </div>
+  <div class="bar"><div id="bar"></div></div>
+</header>
+
+<main class="wrap">
+  <div id="readonly" class="notice" hidden>Estás en modo solo lectura. Para marcar llegadas, pide a quien creó esta página que te invite como editor.</div>
+  <div id="offline" class="notice" hidden>No se pudo conectar con la lista. Revisa tu conexión; la página se actualizará sola cuando vuelva.</div>
+
+  <!-- Recepción -->
+  <section id="p-recepcion" class="panel">
+    <div class="search">
+      <input id="q" type="search" autocomplete="off" placeholder="Buscar por nombre, documento, teléfono…" aria-label="Buscar persona">
+      <div class="chips">
+        <button class="chip" data-f="all" aria-pressed="true">Todos</button>
+        <button class="chip" data-f="wait" aria-pressed="false">Pendientes</button>
+        <button class="chip" data-f="in" aria-pressed="false">Llegaron</button>
+      </div>
+    </div>
+    <p class="hint">Escribe y presiona <kbd>Enter</kbd> para marcar a la persona resaltada. <kbd>↑</kbd> <kbd>↓</kbd> para moverte, <kbd>Esc</kbd> para limpiar.</p>
+    <div id="list" class="list"></div>
+    <div id="listEmpty"></div>
+  </section>
+
+  <!-- Ubicaciones -->
+  <section id="p-plano" class="panel" hidden>
+    <div class="plano">
+      <aside class="side">
+        <h3>Sin ubicación <span id="poolCount" class="pill">0</span></h3>
+        <input id="poolQ" type="search" placeholder="Filtrar…" aria-label="Filtrar personas sin ubicación">
+        <div id="pool" class="pool drop" data-table=""></div>
+        <p class="hint">En computadora, arrastra a las personas hacia una mesa. En el celular, toca a la persona y elige su ubicación.</p>
+      </aside>
+      <div style="min-width:0">
+        <div class="tools">
+          <button id="addMesa" class="btn primary">+ Nueva ubicación</button>
+          <button id="ordenar" class="btn">Ordenar plano</button>
+          <span class="legend"><span><i style="background:var(--ok)"></i>Llegó</span><span><i style="background:var(--wait)"></i>Pendiente</span></span>
+        </div>
+        <div id="canvasWrap" class="canvas-wrap"><div id="canvas" class="canvas"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Datos -->
+  <section id="p-datos" class="panel" hidden>
+    <div class="cards">
+      <div class="card">
+        <h3>Subir lista desde Excel</h3>
+        <p>Archivo .xlsx, .xls o .csv. La primera fila debe tener los títulos de las columnas (Nombre, Apellido, Documento, Mesa…).</p>
+        <input id="file" type="file" accept=".xlsx,.xls,.csv,.ods" aria-label="Elegir archivo de Excel">
+        <div id="impCfg" hidden style="display:grid;gap:10px">
+          <p><b id="impN">0</b> personas en la hoja <select id="impSheet" aria-label="Hoja"></select></p>
+          <label class="field">Columna(s) con el nombre
+            <select id="impName" multiple size="4"></select>
+            <small>Ctrl o Cmd + clic para elegir varias, por ejemplo Nombre y Apellido.</small>
+          </label>
+          <label class="field">Columna de ubicación (mesa, zona, sección) — opcional
+            <select id="impLoc"><option value="">Ninguna</option></select>
+          </label>
+          <label class="radio"><input type="radio" name="impMode" id="modeReplace" value="replace" checked> Reemplazar la lista actual</label>
+          <label class="radio"><input type="radio" name="impMode" id="modeAdd" value="add"> Agregar a la lista actual</label>
+          <div id="impPrev" class="preview"></div>
+          <button id="impGo" class="btn primary">Subir lista</button>
+          <div id="impProg" hidden style="display:grid;gap:6px"><div class="progress"><div id="impBar"></div></div><small id="impTxt"></small></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Descargar lista</h3>
+        <p>Excel con quién llegó, a qué hora, quién lo marcó y su ubicación.</p>
+        <button id="export" class="btn">Descargar Excel</button>
+      </div>
+      <div class="card">
+        <h3>Agregar persona</h3>
+        <form id="addForm" style="display:grid;gap:8px"></form>
+      </div>
+      <div class="card danger">
+        <h3>Borrar todo</h3>
+        <p>Elimina todas las personas y ubicaciones para todos.</p>
+        <button id="reset" class="btn danger">Borrar todo</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlg"><form method="dialog" class="dlg" id="dlgBody"></form></dialog>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+(() => {
+  'use strict';
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const norm = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const hora = (ts) => (ts ? new Date(ts).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '');
+  const uid = (pfx) => pfx + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const cmp = (a, b) => a.localeCompare(b, 'es', { numeric: true, sensitivity: 'base' });
+  const ls = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+
+  // ---------- Estado ----------
+  const S = { columns: [], nameColumns: [], people: new Map(), tables: new Map() };
+  let db = null, user = null, myId = null, canWrite = true, loaded = false;
+  const names = new Map(); // id de usuario -> nombre
+  let filter = 'all', sel = 0, shown = [];
+  const MAX = 150;
+
+  function nameOf(p) {
+    const n = S.nameColumns.map((c) => p.d?.[c]).filter(Boolean).join(' ');
+    return n || Object.values(p.d || {}).find(Boolean) || '(sin nombre)';
+  }
+  function indexPerson(id, data) {
+    const p = { id, ...data };
+    p._name = nameOf(p);
+    p._s = norm(p._name + ' ' + Object.values(p.d || {}).join(' '));
+    S.people.set(id, p);
+    return p;
+  }
+  const reindexAll = () => { for (const [id, p] of S.people) indexPerson(id, p); };
+  const byName = (a, b) => cmp(a._name, b._name);
+
+  // ---------- Utilidades de interfaz ----------
+  function toast(msg) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast.t);
+    toast.t = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+  function openDialog(html, onOpen) {
+    $('#dlg').returnValue = '';
+    $('#dlgBody').innerHTML = html;
+    onOpen && onOpen($('#dlgBody'));
+    $('#dlg').showModal();
+  }
+  // Confirmación dentro de la página (los diálogos del navegador no funcionan aquí)
+  function ask(title, text, okLabel = 'Sí, continuar', danger = false) {
+    return new Promise((resolve) => {
+      openDialog(`<h2>${esc(title)}</h2><p>${esc(text)}</p>
+        <div class="actions"><button class="btn" value="no">Cancelar</button>
+        <button class="btn ${danger ? 'danger' : 'primary'}" value="yes">${esc(okLabel)}</button></div>`);
+      $('#dlg').addEventListener('close', () => resolve($('#dlg').returnValue === 'yes'), { once: true });
+    });
+  }
+  async function write(fn, tries = 4) {
+    for (let i = 0; ; i++) {
+      try { return await fn(); }
+      catch (e) {
+        if ((e?.code === 'resource_exhausted' || e?.code === 'unavailable') && i < tries) { await sleep(400 * 2 ** i + Math.random() * 300); continue; }
+        if (e?.code === 'invalid_argument' && !canWrite) throw e;
+        if (e?.code === 'invalid_argument') { setReadOnly(); }
+        if (e?.code === 'quota_exceeded') toast('La lista llegó al máximo de espacio. Borra datos que no uses e intenta otra vez.');
+        throw e;
+      }
+    }
+  }
+  function setReadOnly() {
+    canWrite = false;
+    $('#readonly').hidden = false;
+    document.body.classList.add('ro');
+    renderAll();
+  }
+  function needWrite() {
+    if (!db) { toast('La lista aún no está conectada.'); return false; }
+    if (!canWrite) { toast('Solo lectura: no puedes hacer cambios.'); return false; }
+    return true;
+  }
+
+  // ---------- Nombres de quién marcó ----------
+  let resolving = false;
+  async function resolveNames() {
+    if (!user || resolving) return;
+    const ids = [...new Set([...S.people.values()].map((p) => p.by).filter((id) => id && !names.has(id)))];
+    if (!ids.length) return;
+    resolving = true;
+    try {
+      const ps = await user.profiles(ids);
+      for (const id of ids) names.set(id, (ps[id] && (ps[id].isMe ? 'ti' : ps[id].name)) || 'alguien');
+    } finally { resolving = false; }
+    scheduleRender();
+  }
+  const byName2 = (id) => (id ? names.get(id) || '…' : '');
+
+  // ---------- Render ----------
+  let raf = 0;
+  function scheduleRender() { if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderAll(true); }); }
+  function renderAll(keep) {
+    renderCounts();
+    renderList(keep);
+    renderPlano();
+    renderAddForm();
+    resolveNames();
+  }
+  function renderCounts() {
+    const total = S.people.size;
+    let inn = 0;
+    for (const p of S.people.values()) if (p.arrived) inn++;
+    $('#cTotal').textContent = total;
+    $('#cIn').textContent = inn;
+    $('#cWait').textContent = total - inn;
+    $('#bar').style.width = total ? (inn / total) * 100 + '%' : '0';
+  }
+
+  function highlight(text, terms) {
+    if (!terms.length) return esc(text);
+    const n = norm(text);
+    if (n.length !== text.length) return esc(text);
+    const m = new Array(text.length).fill(false);
+    for (const t of terms) for (let i = n.indexOf(t); i !== -1; i = n.indexOf(t, i + t.length)) for (let k = i; k < i + t.length; k++) m[k] = true;
+    let out = '', open = false;
+    for (let i = 0; i < text.length; i++) {
+      if (m[i] !== open) { out += m[i] ? '<mark>' : '</mark>'; open = m[i]; }
+      out += esc(text[i]);
+    }
+    return out + (open ? '</mark>' : '');
+  }
+
+  function search() {
+    const terms = norm($('#q').value.trim()).split(/\s+/).filter(Boolean);
+    let list = [...S.people.values()];
+    if (filter === 'wait') list = list.filter((p) => !p.arrived);
+    if (filter === 'in') list = list.filter((p) => p.arrived);
+    if (terms.length) {
+      const f = terms[0];
+      list = list.filter((p) => terms.every((t) => p._s.includes(t)))
+        .map((p) => { const nn = norm(p._name); return [nn.startsWith(f) ? 0 : nn.split(/\s+/).some((w) => w.startsWith(f)) ? 1 : nn.includes(f) ? 2 : 3, p]; })
+        .sort((a, b) => a[0] - b[0] || byName(a[1], b[1])).map((x) => x[1]);
+    } else if (filter === 'in') list.sort((a, b) => (b.at || 0) - (a.at || 0));
+    else list.sort(byName);
+    return { list, terms };
+  }
+
+  function renderList(keep) {
+    const { list, terms } = search();
+    const prev = shown[sel]?.id;
+    shown = list.slice(0, MAX);
+    if (keep && prev) { const i = shown.findIndex((p) => p.id === prev); sel = i >= 0 ? i : Math.min(sel, Math.max(0, shown.length - 1)); }
+    else if (!keep) sel = 0;
+    const metaCols = S.columns.filter((c) => !S.nameColumns.includes(c)).slice(0, 4);
+    $('#list').innerHTML = shown.map((p, i) => {
+      const t = p.table && S.tables.get(p.table);
+      const meta = metaCols.map((c) => p.d?.[c]).filter(Boolean).join(' · ');
+      return `<div class="row ${p.arrived ? 'in' : ''} ${i === sel ? 'sel' : ''}" data-id="${p.id}" data-i="${i}">
+        <div class="who"><div class="name">${highlight(p._name, terms)}</div><div class="meta">${highlight(meta, terms)}</div></div>
+        <button class="loc ${t ? '' : 'none'}" data-act="loc" title="${t ? 'Ver en el plano' : 'Asignar ubicación'}">${t ? esc(t.name) : 'Sin ubicación'}</button>
+        <button class="mark ${p.arrived ? 'on' : ''}" data-act="mark" ${canWrite ? '' : 'disabled'}>${p.arrived
+          ? `✓ Llegó ${hora(p.at)}<small>${p.by ? 'marcó ' + esc(byName2(p.by)) : ''}</small>` : 'Marcar llegada'}</button>
+      </div>`;
+    }).join('') + (list.length > MAX ? `<div class="more">Mostrando ${MAX} de ${list.length}. Escribe más para afinar.</div>` : '');
+
+    let empty = '';
+    if (!loaded && !S.people.size) empty = '<div class="empty">Cargando la lista…</div>';
+    else if (!S.people.size) empty = `<div class="empty-card"><h2>Todavía no hay personas en la lista</h2>
+      <p>Sube tu Excel desde la pestaña Datos. Apenas se cargue, todos los que tengan esta página abierta verán la lista y las llegadas en tiempo real.</p>
+      <button class="btn primary" data-go="datos">Subir mi Excel</button>
+      <button class="btn" id="demo">Probar con 24 personas de ejemplo</button></div>`;
+    else if (!list.length) empty = '<div class="empty">No se encontró a nadie con esa búsqueda.</div>';
+    $('#listEmpty').innerHTML = empty;
+  }
+
+  function moveSel(d) {
+    if (!shown.length) return;
+    sel = Math.max(0, Math.min(shown.length - 1, sel + d));
+    $$('#list .row').forEach((el) => el.classList.toggle('sel', +el.dataset.i === sel));
+    $(`#list .row[data-i="${sel}"]`)?.scrollIntoView({ block: 'nearest' });
+  }
+
+  // ---------- Acciones ----------
+  async function toggle(p) {
+    if (!needWrite()) return;
+    const arrived = !p.arrived;
+    toast(arrived ? `✓ ${p._name} llegó` : `${p._name} desmarcado`);
+    try { await write(() => db.doc('people/' + p.id).update({ arrived, at: arrived ? Date.now() : null, by: arrived ? myId : null })); }
+    catch { toast('No se pudo guardar. Intenta otra vez.'); }
+  }
+  async function assign(pid, tableId) {
+    if (!needWrite()) return;
+    try { await write(() => db.doc('people/' + pid).update({ table: tableId || '' })); }
+    catch { toast('No se pudo cambiar la ubicación.'); }
+  }
+
+  function openPerson(p) {
+    const tables = [...S.tables.values()].sort((a, b) => cmp(a.name, b.name));
+    const count = (tid) => [...S.people.values()].filter((x) => x.table === tid).length;
+    openDialog(`<h2>${esc(p._name)}</h2>
+      <dl>${S.columns.map((c) => `<dt>${esc(c)}</dt><dd>${esc(p.d?.[c] || '—')}</dd>`).join('')}</dl>
+      <p>${p.arrived ? `✓ Llegó a las <b>${hora(p.at)}</b>${p.by ? ` · marcó <b>${esc(byName2(p.by))}</b>` : ''}` : 'Aún no ha llegado.'}</p>
+      <label class="field">Ubicación
+        <select id="dLoc" ${canWrite ? '' : 'disabled'}><option value="">Sin ubicación</option>${tables.map((t) =>
+          `<option value="${t.id}" ${t.id === p.table ? 'selected' : ''}>${esc(t.name)} (${count(t.id)}/${t.capacity})</option>`).join('')}</select></label>
+      <div class="actions"><button class="btn" value="close">Cerrar</button>
+        ${canWrite ? `<button class="btn primary" value="close" id="dMark">${p.arrived ? 'Quitar llegada' : 'Marcar llegada'}</button>` : ''}</div>`,
+      (el) => {
+        $('#dLoc', el).addEventListener('change', (e) => { assign(p.id, e.target.value); toast('Ubicación guardada'); });
+        $('#dMark', el)?.addEventListener('click', () => toggle(S.people.get(p.id)));
+      });
+  }
+
+  // ---------- Recepción: eventos ----------
+  $('#q').addEventListener('input', () => renderList(false));
+  $('#q').addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { e.preventDefault(); moveSel(1); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); moveSel(-1); }
+    else if (e.key === 'Enter') { e.preventDefault(); const p = shown[sel]; if (p) { toggle(p); e.target.select(); } }
+    else if (e.key === 'Escape') { e.target.value = ''; renderList(false); }
+  });
+  $$('.chip').forEach((b) => b.addEventListener('click', () => {
+    filter = b.dataset.f;
+    $$('.chip').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    renderList(false);
+  }));
+  $('#list').addEventListener('click', (e) => {
+    const row = e.target.closest('.row'); if (!row) return;
+    const p = S.people.get(row.dataset.id); if (!p) return;
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'mark') toggle(p);
+    else if (act === 'loc' && p.table && S.tables.has(p.table)) { showTab('plano'); flash(p.table); }
+    else openPerson(p);
+  });
+  $('#listEmpty').addEventListener('click', (e) => {
+    if (e.target.closest('[data-go]')) showTab('datos');
+    if (e.target.closest('#demo')) loadDemo();
+  });
+
+  // ---------- Plano ----------
+  const chip = (p) => `<div class="p ${p.arrived ? 'in' : ''}" draggable="true" data-id="${p.id}" title="${esc(p._name)}"><span>${esc(p._name)}</span></div>`;
+  let dragMesa = null;
+
+  function renderPlano() {
+    if (dragMesa) return;
+    const groups = new Map([...S.tables.keys()].map((id) => [id, []]));
+    const pool = [];
+    for (const p of S.people.values()) (p.table && groups.has(p.table) ? groups.get(p.table) : pool).push(p);
+    const q = norm($('#poolQ').value.trim());
+    const vis = pool.filter((p) => !q || p._s.includes(q)).sort(byName);
+    $('#poolCount').textContent = pool.length;
+    $('#pool').innerHTML = vis.slice(0, 300).map(chip).join('') ||
+      `<div class="hint">${pool.length ? 'Sin coincidencias' : S.people.size ? 'Todas las personas tienen ubicación.' : 'Aquí aparecerán las personas sin mesa.'}</div>`;
+
+    let mx = 0, my = 0;
+    const mesas = [...S.tables.values()];
+    $('#canvas').innerHTML = mesas.map((t) => {
+      const ps = groups.get(t.id).sort(byName);
+      const inn = ps.filter((p) => p.arrived).length;
+      mx = Math.max(mx, t.x + 200); my = Math.max(my, t.y + 290);
+      const cls = ps.length > t.capacity ? 'over' : ps.length && inn === ps.length ? 'full' : '';
+      return `<div class="mesa drop ${cls}" data-table="${t.id}" style="left:${t.x}px;top:${t.y}px">
+        <div class="mhead"><span class="mname">${esc(t.name)}</span>
+          <span class="mcount" title="Llegaron / asignados / capacidad">${inn}/${ps.length}/${t.capacity}</span>
+          <button class="medit" data-edit="${t.id}" aria-label="Editar ${esc(t.name)}" title="Editar">✎</button></div>
+        <div class="mbar"><div style="width:${ps.length ? (inn / ps.length) * 100 : 0}%"></div></div>
+        <div class="mbody">${ps.map(chip).join('') || '<div class="vacia">Vacía</div>'}</div></div>`;
+    }).join('') || `<div class="empty">Aún no hay ubicaciones. Crea una con “+ Nueva ubicación”, o sube un Excel que tenga una columna de mesa o zona.</div>`;
+    $('#canvas').style.width = mx + 'px';
+    $('#canvas').style.height = my + 'px';
+  }
+  function flash(id) {
+    renderPlano();
+    const el = $(`.mesa[data-table="${id}"]`); if (!el) return;
+    el.scrollIntoView({ block: 'center', inline: 'center' });
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 3000);
+  }
+  $('#poolQ').addEventListener('input', renderPlano);
+
+  // Arrastrar personas
+  document.addEventListener('dragstart', (e) => {
+    const c = e.target.closest?.('.p'); if (!c) return;
+    e.dataTransfer.setData('text/plain', c.dataset.id);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  document.addEventListener('dragover', (e) => {
+    const t = e.target.closest?.('.drop'); if (!t) return;
+    e.preventDefault();
+    $$('.over-target').forEach((x) => x !== t && x.classList.remove('over-target'));
+    t.classList.add('over-target');
+  });
+  document.addEventListener('dragleave', (e) => { const t = e.target.closest?.('.drop'); if (t && !t.contains(e.relatedTarget)) t.classList.remove('over-target'); });
+  document.addEventListener('drop', async (e) => {
+    const t = e.target.closest?.('.drop');
+    $$('.over-target').forEach((x) => x.classList.remove('over-target'));
+    if (!t) return;
+    e.preventDefault();
+    const p = S.people.get(e.dataTransfer.getData('text/plain')); if (!p) return;
+    const tid = t.dataset.table || '';
+    if ((p.table || '') === tid) return;
+    const mesa = tid && S.tables.get(tid);
+    if (mesa) {
+      const n = [...S.people.values()].filter((x) => x.table === tid).length;
+      if (n >= mesa.capacity && !(await ask('Ubicación llena', `"${mesa.name}" ya tiene ${n} de ${mesa.capacity} lugares. ¿Agregar a ${p._name} de todos modos?`, 'Agregar'))) return;
+    }
+    assign(p.id, tid);
+  });
+  $('#p-plano').addEventListener('click', (e) => {
+    const ed = e.target.closest('[data-edit]');
+    if (ed) return editMesa(S.tables.get(ed.dataset.edit));
+    const c = e.target.closest('.p'); if (c) openPerson(S.people.get(c.dataset.id));
+  });
+
+  // Mover mesas (mouse y táctil)
+  const cv = $('#canvas');
+  cv.addEventListener('pointerdown', (e) => {
+    const h = e.target.closest('.mhead'); if (!h || e.target.closest('[data-edit]') || !canWrite) return;
+    const el = h.parentElement, t = S.tables.get(el.dataset.table); if (!t) return;
+    dragMesa = { el, t, sx: e.clientX, sy: e.clientY, ox: t.x, oy: t.y, x: t.x, y: t.y };
+    h.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener('pointermove', (e) => {
+    const d = dragMesa; if (!d) return;
+    d.x = Math.max(0, Math.round((d.ox + e.clientX - d.sx) / 10) * 10);
+    d.y = Math.max(0, Math.round((d.oy + e.clientY - d.sy) / 10) * 10);
+    d.el.style.left = d.x + 'px'; d.el.style.top = d.y + 'px';
+  });
+  const endDrag = async () => {
+    const d = dragMesa; if (!d) return;
+    dragMesa = null;
+    if (d.x !== d.ox || d.y !== d.oy) {
+      d.t.x = d.x; d.t.y = d.y;
+      try { await write(() => db.doc('tables/' + d.t.id).update({ x: d.x, y: d.y })); } catch {}
+    }
+    renderPlano();
+  };
+  cv.addEventListener('pointerup', endDrag);
+  cv.addEventListener('pointercancel', endDrag);
+
+  function editMesa(t) {
+    if (!needWrite()) return;
+    const isNew = !t;
+    openDialog(`<h2>${isNew ? 'Nueva ubicación' : 'Editar ubicación'}</h2>
+      <label class="field">Nombre (mesa, zona, sección)<input id="mName" maxlength="60" value="${esc(t?.name || 'Mesa ' + (S.tables.size + 1))}"></label>
+      <label class="field">Lugares<input id="mCap" type="number" min="1" max="500" value="${t?.capacity || 10}"></label>
+      <div class="actions">${isNew ? '' : '<button class="btn danger" value="del" id="mDel">Eliminar</button>'}
+        <button class="btn" value="no">Cancelar</button><button class="btn primary" value="ok">Guardar</button></div>`,
+      () => setTimeout(() => $('#mName')?.select(), 30));
+    $('#dlg').addEventListener('close', async () => {
+      const v = $('#dlg').returnValue;
+      const name = ($('#mName').value || '').trim().slice(0, 60) || 'Mesa';
+      const capacity = Math.max(1, Math.min(500, parseInt($('#mCap').value, 10) || 10));
+      try {
+        if (v === 'ok' && isNew) {
+          const w = $('#canvasWrap');
+          const id = uid('t');
+          await write(() => db.doc('tables/' + id).set({ name, capacity, x: Math.round((w.scrollLeft + 30) / 10) * 10, y: Math.round((w.scrollTop + 30) / 10) * 10 }));
+        } else if (v === 'ok') {
+          await write(() => db.doc('tables/' + t.id).update({ name, capacity }));
+        } else if (v === 'del') {
+          if (!(await ask('Eliminar ubicación', `Las personas de "${t.name}" quedarán sin ubicación.`, 'Eliminar', true))) return;
+          const ids = [...S.people.values()].filter((p) => p.table === t.id).map((p) => p.id);
+          await runPool(ids, (pid) => db.doc('people/' + pid).update({ table: '' }));
+          await write(() => db.doc('tables/' + t.id).delete());
+        }
+      } catch { toast('No se pudo guardar la ubicación.'); }
+    }, { once: true });
+  }
+  $('#addMesa').addEventListener('click', () => editMesa(null));
+  $('#ordenar').addEventListener('click', async () => {
+    if (!needWrite() || !S.tables.size) return;
+    const cols = Math.max(1, Math.floor(($('#canvasWrap').clientWidth - 20) / 196));
+    const list = [...S.tables.values()].sort((a, b) => cmp(a.name, b.name));
+    list.forEach((t, i) => { t.x = 20 + (i % cols) * 196; t.y = 20 + Math.floor(i / cols) * 290; });
+    renderPlano();
+    await runPool(list.map((t) => t.id), (id) => { const t = S.tables.get(id); return db.doc('tables/' + id).update({ x: t.x, y: t.y }); });
+  });
+
+  // ---------- Escrituras en grupo ----------
+  async function runPool(items, fn, onProgress, conc = 4) {
+    let i = 0, done = 0;
+    const worker = async () => {
+      while (i < items.length) {
+        const it = items[i++];
+        await write(() => fn(it), 6);
+        done++;
+        onProgress && onProgress(done, items.length);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(conc, items.length) }, worker));
+  }
+
+  async function importRows({ columns, rows, nameColumns, locationColumn, mode }) {
+    if (!needWrite()) return;
+    const prog = (txt, f) => { $('#impProg').hidden = false; $('#impTxt').textContent = txt; $('#impBar').style.width = (f * 100) + '%'; };
+    $('#impGo').disabled = true;
+    try {
+      if (mode === 'replace') {
+        const old = [...S.people.keys()].map((id) => 'people/' + id).concat([...S.tables.keys()].map((id) => 'tables/' + id));
+        if (old.length) await runPool(old, (path) => db.doc(path).delete(), (d, n) => prog(`Borrando la lista anterior… ${d} de ${n}`, d / n));
+      }
+      const cols = mode === 'add' ? [...new Set([...S.columns, ...columns])] : columns;
+      const nc = nameColumns.length ? nameColumns : [columns[0]];
+      await write(() => db.doc('meta/config').set({ columns: cols, nameColumns: nc }));
+
+      // Ubicaciones a partir de la columna elegida
+      const existing = mode === 'add' ? new Map([...S.tables.values()].map((t) => [norm(t.name), t.id])) : new Map();
+      const newTables = [];
+      const tableFor = (name) => {
+        const k = norm(name);
+        if (!existing.has(k)) { const id = uid('t'); existing.set(k, id); newTables.push({ id, name, count: 0 }); }
+        return existing.get(k);
+      };
+      const docs = rows.map((r) => {
+        const d = {};
+        for (const c of columns) { const v = String(r[c] ?? '').trim(); if (v) d[c] = v.slice(0, 500); }
+        const loc = locationColumn && d[locationColumn];
+        const table = loc ? tableFor(loc) : '';
+        if (table) { const nt = newTables.find((t) => t.id === table); if (nt) nt.count++; }
+        return { id: uid('p'), body: { d, arrived: false, at: null, by: null, table } };
+      });
+      const base = S.tables.size && mode === 'add' ? S.tables.size : 0;
+      newTables.sort((a, b) => cmp(a.name, b.name));
+      await runPool(newTables, (t) => {
+        const i = base + newTables.indexOf(t);
+        return db.doc('tables/' + t.id).set({ name: t.name, capacity: Math.max(10, t.count), x: 20 + (i % 6) * 196, y: 20 + Math.floor(i / 6) * 290 });
+      });
+      await runPool(docs, (x) => db.doc('people/' + x.id).set(x.body), (d, n) => prog(`Subiendo personas… ${d} de ${n}`, d / n));
+      prog(`Listo: ${docs.length} personas en la lista.`, 1);
+      toast(`Se subieron ${docs.length} personas`);
+      $('#impCfg').hidden = true;
+      $('#file').value = '';
+      showTab('recepcion');
+    } catch (e) {
+      prog('La subida se detuvo antes de terminar. Revisa tu conexión y vuelve a intentarlo (elige “Reemplazar” para no duplicar).', 0);
+    } finally { $('#impGo').disabled = false; }
+  }
+
+  // ---------- Excel ----------
+  let wb = null, impCols = [], impRows = [];
+  $('#file').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    if (!window.XLSX) return toast('No se pudo cargar el lector de Excel. Recarga la página.');
+    try {
+      wb = XLSX.read(await f.arrayBuffer(), { cellDates: true });
+      $('#impSheet').innerHTML = wb.SheetNames.map((n) => `<option>${esc(n)}</option>`).join('');
+      loadSheet();
+      $('#impCfg').hidden = false;
+      $('#impProg').hidden = true;
+    } catch { toast('No se pudo leer ese archivo. Prueba guardarlo como .xlsx.'); }
+  });
+  $('#impSheet').addEventListener('change', loadSheet);
+  function loadSheet() {
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[$('#impSheet').value], { header: 1, defval: '', raw: false });
+    const seen = {};
+    impCols = (rows[0] || []).map((h, i) => String(h).trim() || `Columna ${i + 1}`)
+      .map((h) => (seen[h] = (seen[h] || 0) + 1) > 1 ? `${h} (${seen[h]})` : h)
+      .map((h) => h.slice(0, 80));
+    impRows = rows.slice(1).map((r) => Object.fromEntries(impCols.map((c, i) => [c, r[i] ?? ''])))
+      .filter((r) => Object.values(r).some((v) => String(v).trim()));
+    $('#impN').textContent = impRows.length;
+    const nameGuess = impCols.filter((c) => /nombre|name|apellido|invitad|participante|asistente/i.test(c));
+    const locGuess = impCols.find((c) => /mesa|table|ubicaci|zona|secci|asiento|lugar|sala|grupo/i.test(c)) || '';
+    $('#impName').innerHTML = impCols.map((c, i) => `<option value="${esc(c)}" ${(nameGuess.length ? nameGuess.includes(c) : i === 0) ? 'selected' : ''}>${esc(c)}</option>`).join('');
+    $('#impLoc').innerHTML = '<option value="">Ninguna</option>' + impCols.map((c) => `<option value="${esc(c)}" ${c === locGuess ? 'selected' : ''}>${esc(c)}</option>`).join('');
+    $('#impPrev').innerHTML = `<table><tr>${impCols.map((c) => `<th>${esc(c)}</th>`).join('')}</tr>${impRows.slice(0, 5).map((r) => `<tr>${impCols.map((c) => `<td>${esc(r[c])}</td>`).join('')}</tr>`).join('')}</table>`;
+  }
+  $('#impGo').addEventListener('click', async () => {
+    const mode = $('#modeAdd').checked ? 'add' : 'replace';
+    if (!impRows.length) return toast('Esa hoja no tiene filas con datos.');
+    if (mode === 'replace' && S.people.size &&
+      !(await ask('Reemplazar la lista', `Se borrarán las ${S.people.size} personas actuales y sus llegadas, para todos. ¿Continuar?`, 'Reemplazar', true))) return;
+    importRows({ columns: impCols, rows: impRows, nameColumns: $$('#impName option:checked').map((o) => o.value), locationColumn: $('#impLoc').value, mode });
+  });
+
+  function loadDemo() {
+    const n = ['Ana', 'Luis', 'María', 'José', 'Sofía', 'Carlos', 'Lucía', 'Andrés', 'Valeria', 'Diego', 'Camila', 'Jorge'];
+    const a = ['Pérez', 'Gómez', 'Rodríguez', 'Hernández', 'López', 'Martínez', 'Sánchez', 'Ramírez'];
+    const rows = Array.from({ length: 24 }, (_, i) => ({ Nombre: n[i % 12], Apellido: a[(i * 5) % 8] + ' (ejemplo)', Documento: String(10000000 + i * 7919), Mesa: 'Mesa ' + (1 + Math.floor(i / 6)) }));
+    importRows({ columns: ['Nombre', 'Apellido', 'Documento', 'Mesa'], rows, nameColumns: ['Nombre', 'Apellido'], locationColumn: 'Mesa', mode: 'replace' });
+  }
+
+  // ---------- Descargar ----------
+  $('#export').addEventListener('click', async () => {
+    if (!S.people.size) return toast('No hay personas para descargar.');
+    const dl = await claude.use('downloads');
+    if (!dl || !window.XLSX) return toast('La descarga no está disponible en esta vista.');
+    const rows = [...S.people.values()].sort(byName).map((p) => ({ ...p.d, 'Llegó': p.arrived ? 'Sí' : 'No', 'Hora de llegada': p.at ? new Date(p.at).toLocaleString('es') : '', 'Marcó': p.by ? byName2(p.by) : '', 'Ubicación': S.tables.get(p.table)?.name || '' }));
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, XLSX.utils.json_to_sheet(rows), 'Recepción');
+    const data = XLSX.write(book, { type: 'array', bookType: 'xlsx' });
+    try { await dl.save({ filename: `recepcion_${new Date().toISOString().slice(0, 10)}.xlsx`, data: new Uint8Array(data) }); }
+    catch (e) { if (e?.code !== 'declined') toast('No se pudo descargar el archivo.'); }
+  });
+
+  // ---------- Agregar persona ----------
+  let formKey = '';
+  function renderAddForm() {
+    const cols = S.columns.length ? S.columns : ['Nombre', 'Apellido'];
+    const k = cols.join('|') + canWrite;
+    if (k === formKey) return;
+    formKey = k;
+    $('#addForm').innerHTML = cols.slice(0, 12).map((c, i) => `<label class="field">${esc(c)}<input id="add-${i}" name="${esc(c)}" type="text"></label>`).join('') +
+      `<button class="btn primary" ${canWrite ? '' : 'disabled'}>Agregar a la lista</button>`;
+  }
+  $('#addForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!needWrite()) return;
+    const d = {};
+    for (const [k, v] of new FormData(e.target)) if (String(v).trim()) d[k] = String(v).trim().slice(0, 500);
+    if (!Object.keys(d).length) return toast('Escribe al menos un dato.');
+    try {
+      if (!S.columns.length) await write(() => db.doc('meta/config').set({ columns: Object.keys(d), nameColumns: Object.keys(d) }));
+      await write(() => db.doc('people/' + uid('p')).set({ d, arrived: false, at: null, by: null, table: '' }));
+      e.target.reset();
+      toast('Persona agregada');
+    } catch { toast('No se pudo agregar.'); }
+  });
+
+  // ---------- Borrar todo ----------
+  $('#reset').addEventListener('click', async () => {
+    if (!needWrite()) return;
+    if (!(await ask('Borrar todo', `Se eliminarán ${S.people.size} personas y ${S.tables.size} ubicaciones para todos. No se puede deshacer.`, 'Borrar todo', true))) return;
+    const paths = [...S.people.keys()].map((id) => 'people/' + id).concat([...S.tables.keys()].map((id) => 'tables/' + id));
+    try { await runPool(paths, (p) => db.doc(p).delete()); await write(() => db.doc('meta/config').set({ columns: [], nameColumns: [] })); toast('Lista borrada'); }
+    catch { toast('No se pudo borrar todo. Intenta otra vez.'); }
+  });
+
+  // ---------- Pestañas ----------
+  function showTab(name) {
+    for (const t of ['recepcion', 'plano', 'datos']) {
+      $('#t-' + t).setAttribute('aria-selected', String(t === name));
+      $('#p-' + t).hidden = t !== name;
+    }
+    ls.set('rv_tab', name);
+    if (name === 'plano') renderPlano();
+  }
+  for (const t of ['recepcion', 'plano', 'datos']) $('#t-' + t).addEventListener('click', () => showTab(t));
+
+  // ---------- Conexión en vivo ----------
+  async function start() {
+    renderAll();
+    if (!window.claude?.use) { $('#offline').hidden = false; $('#offline').textContent = 'Abre esta página en Claude para usar la lista compartida.'; return; }
+    [db, user] = await Promise.all([claude.use('db'), claude.use('user')]);
+    if (!db) {
+      $('#offline').hidden = false;
+      $('#offline').textContent = 'Inicia sesión en Claude para ver y marcar la lista compartida.';
+      loaded = true; canWrite = false; renderAll(); return;
+    }
+    if (user) {
+      myId = await user.id();
+      const can = await user.can('data.write');
+      if (can === false) setReadOnly();
+    }
+    const timer = setTimeout(() => { if (!loaded) $('#offline').hidden = false; }, 10000);
+    let gotPeople = false;
+    const settle = (snap) => {
+      if (!snap.metadata.fromCache) { clearTimeout(timer); $('#offline').hidden = true; $('#live').classList.add('on'); $('#live').title = 'Conectado en tiempo real'; }
+    };
+    const onErr = () => { clearTimeout(timer); $('#live').classList.remove('on'); $('#offline').hidden = false; loaded = true; scheduleRender(); };
+
+    db.doc('meta/config').onSnapshot((s) => {
+      const c = s.exists ? s.data() : {};
+      S.columns = Array.isArray(c.columns) ? c.columns : [];
+      S.nameColumns = Array.isArray(c.nameColumns) ? c.nameColumns : [];
+      reindexAll();
+      settle(s);
+      scheduleRender();
+    }, onErr);
+
+    db.collection('tables').onSnapshot((snap) => {
+      for (const ch of snap.docChanges()) {
+        if (ch.type === 'removed') S.tables.delete(ch.doc.id);
+        else { const d = ch.doc.data(); S.tables.set(ch.doc.id, { id: ch.doc.id, name: String(d.name || 'Mesa'), capacity: +d.capacity || 10, x: +d.x || 0, y: +d.y || 0 }); }
+      }
+      settle(snap);
+      scheduleRender();
+    }, onErr);
+
+    db.collection('people').onSnapshot((snap) => {
+      for (const ch of snap.docChanges()) {
+        if (ch.type === 'removed') { S.people.delete(ch.doc.id); continue; }
+        const before = S.people.get(ch.doc.id);
+        const p = indexPerson(ch.doc.id, ch.doc.data());
+        // Aviso cuando otra persona marca una llegada
+        if (gotPeople && before && !before.arrived && p.arrived && p.by && p.by !== myId && !snap.metadata.hasPendingWrites) {
+          setTimeout(() => toast(`✓ ${p._name} llegó (marcó ${byName2(p.by)})`), 300);
+        }
+      }
+      if (!snap.metadata.fromCache) { gotPeople = true; loaded = true; }
+      settle(snap);
+      scheduleRender();
+    }, onErr);
+  }
+
+  showTab(ls.get('rv_tab') || 'recepcion');
+  start();
+})();
+</script>
