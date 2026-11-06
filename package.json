@@ -1,0 +1,27 @@
+{
+  "name": "plataforma-recepcion",
+  "version": "1.0.0",
+  "description": "Recepción de personas en tiempo real desde Excel: búsqueda rápida, marcado de llegada y plano de ubicaciones",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/glorianagodinez1-prog/Plataforma-b-squeda-.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/glorianagodinez1-prog/Plataforma-b-squeda-/issues"
+  },
+  "homepage": "https://github.com/glorianagodinez1-prog/Plataforma-b-squeda-#readme",
+  "dependencies": {
+    "express": "^4.22.3",
+    "socket.io": "^4.8.4",
+    "xlsx": "^0.18.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

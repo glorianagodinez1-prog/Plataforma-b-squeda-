@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recepción en vivo</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">Recepción en vivo</div>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="recepcion" role="tab">Recepción</button>
+      <button class="tab" data-tab="plano" role="tab">Ubicaciones</button>
+      <button class="tab" data-tab="datos" role="tab">Datos</button>
+    </nav>
+    <div class="status">
+      <span id="conn" class="dot off" title="Conexión"></span>
+      <button id="onlineBtn" class="link" title="Personas conectadas">0 conectados</button>
+      <button id="userBtn" class="link" title="Cambiar tu nombre">—</button>
+    </div>
+  </header>
+
+  <section class="stats">
+    <div class="stat"><span id="stTotal">0</span><small>Total</small></div>
+    <div class="stat ok"><span id="stArrived">0</span><small>Llegaron</small></div>
+    <div class="stat pend"><span id="stPending">0</span><small>Pendientes</small></div>
+    <div class="progress"><div id="stBar"></div></div>
+  </section>
+
+  <!-- ===== Recepción ===== -->
+  <main id="tab-recepcion" class="panel active">
+    <div class="searchbar">
+      <input id="search" type="search" autocomplete="off" placeholder="Buscar por nombre, documento, cualquier dato…  ( / )" />
+      <div class="filters">
+        <button class="chip active" data-filter="all">Todos</button>
+        <button class="chip" data-filter="pending">Pendientes</button>
+        <button class="chip" data-filter="arrived">Llegaron</button>
+      </div>
+    </div>
+    <p class="hint">Escribe y presiona <kbd>Enter</kbd> para marcar la llegada de la persona resaltada. <kbd>↑</kbd><kbd>↓</kbd> para moverte, <kbd>Esc</kbd> para limpiar.</p>
+    <div id="results" class="results"></div>
+    <div id="emptyMsg" class="empty hidden"></div>
+  </main>
+
+  <!-- ===== Plano de ubicaciones ===== -->
+  <main id="tab-plano" class="panel">
+    <div class="plano-layout">
+      <aside class="sidebar">
+        <h3>Sin ubicación <span id="unassignedCount" class="badge">0</span></h3>
+        <input id="sideSearch" type="search" placeholder="Filtrar…" />
+        <div id="unassigned" class="unassigned droptarget" data-table=""></div>
+        <p class="hint small">Arrastra una persona hacia una mesa/zona. Arrastra las mesas por su título para acomodar el plano.</p>
+      </aside>
+      <div class="plano-main">
+        <div class="plano-toolbar">
+          <button id="addTable" class="btn primary">+ Nueva ubicación</button>
+          <button id="autoLayout" class="btn">Ordenar plano</button>
+          <span class="legend"><i class="lg ok"></i>Llegó <i class="lg pend"></i>Pendiente</span>
+        </div>
+        <div id="canvasWrap" class="canvas-wrap">
+          <div id="canvas" class="canvas"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== Datos / Importar ===== -->
+  <main id="tab-datos" class="panel">
+    <div class="cards">
+      <div class="card">
+        <h3>Importar desde Excel</h3>
+        <p>Sube tu archivo <b>.xlsx</b>, <b>.xls</b> o <b>.csv</b>. La primera fila debe tener los títulos de las columnas.</p>
+        <input id="file" type="file" accept=".xlsx,.xls,.csv,.ods" />
+        <div id="importCfg" class="hidden">
+          <p><b id="impRows">0</b> filas encontradas en la hoja
+            <select id="impSheet"></select></p>
+          <label>Columna(s) con el nombre de la persona
+            <select id="impName" multiple size="4"></select>
+            <small>Ctrl/Cmd + clic para elegir varias (ej. Nombre + Apellido).</small>
+          </label>
+          <label>Columna de ubicación (mesa, zona, sección…) — opcional
+            <select id="impLoc"><option value="">— Ninguna —</option></select>
+          </label>
+          <label class="row"><input type="radio" name="impMode" value="replace" checked /> Reemplazar la lista actual</label>
+          <label class="row"><input type="radio" name="impMode" value="add" /> Agregar a la lista actual</label>
+          <div class="preview" id="impPreview"></div>
+          <button id="impGo" class="btn primary">Importar</button>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Exportar</h3>
+        <p>Descarga la lista con el estado de llegada, hora, quién marcó y ubicación.</p>
+        <button id="exportBtn" class="btn">Descargar Excel</button>
+      </div>
+      <div class="card">
+        <h3>Agregar persona</h3>
+        <form id="addForm"></form>
+      </div>
+      <div class="card danger">
+        <h3>Borrar todo</h3>
+        <p>Elimina todas las personas y ubicaciones para todos los usuarios.</p>
+        <button id="resetBtn" class="btn dangerbtn">Borrar todo</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== Modal ===== -->
+  <dialog id="modal">
+    <form method="dialog" class="modal-body" id="modalBody"></form>
+  </dialog>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/vendor/xlsx.full.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
